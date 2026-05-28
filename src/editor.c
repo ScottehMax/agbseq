@@ -165,7 +165,7 @@ void editor_init(Editor *editor)
 
 void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const InputState *input)
 {
-    const bool select_held = (input->held & KEY_SELECT) != 0;
+    const bool select_down = ((input->held | input->hit) & KEY_SELECT) != 0;
     const u8 previous_track = editor->cursor_track;
 
     editor->song_dirty = false;
@@ -178,7 +178,7 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         return;
     }
 
-    if(select_held)
+    if(select_down)
     {
         if(input->hit & KEY_L)
         {
@@ -279,8 +279,6 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         PatternCell *cell = editor_cursor_cell(editor, song);
         cell->note = editor->current_note;
         cell->instrument = editor_default_instrument(editor->cursor_track);
-        cell->effect = EFFECT_NONE;
-        cell->param = 0;
         editor_preview_note(
             editor,
             (AudioChannel)editor->cursor_track,
