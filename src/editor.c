@@ -14,10 +14,22 @@ static void editor_raise_note(Editor *editor)
         editor->current_note++;
 }
 
+static void editor_raise_octave(Editor *editor)
+{
+    if(editor->current_note <= 71)
+        editor->current_note += 12;
+}
+
 static void editor_lower_note(Editor *editor)
 {
     if(editor->current_note > 24)
         editor->current_note--;
+}
+
+static void editor_lower_octave(Editor *editor)
+{
+    if(editor->current_note >= 36)
+        editor->current_note -= 12;
 }
 
 static PatternCell *editor_cursor_cell(Editor *editor, Song *song)
@@ -25,6 +37,34 @@ static PatternCell *editor_cursor_cell(Editor *editor, Song *song)
     const u8 pattern_index = song->order[0];
 
     return &song->patterns[pattern_index].cells[editor->cursor_row][editor->cursor_track];
+}
+
+static void editor_pickup_cell_note(Editor *editor, Song *song)
+{
+    const PatternCell *cell = editor_cursor_cell(editor, song);
+
+    if(cell->note != SONG_EMPTY_NOTE)
+        editor->current_note = cell->note;
+}
+
+static void editor_apply_pitch_to_cell(Editor *editor, Song *song)
+{
+    PatternCell *cell = editor_cursor_cell(editor, song);
+
+    if(cell->note == SONG_EMPTY_NOTE)
+        return;
+
+    cell->note = editor->current_note;
+    cell->instrument = editor_default_instrument(editor->cursor_track);
+    audio_trigger_note((AudioChannel)editor->cursor_track, cell->note, instrument_get(cell->instrument));
+    editor->song_dirty = true;
+}
+
+static void editor_advance_row(Editor *editor)
+{
+    editor->cursor_row++;
+    if(editor->cursor_row >= SONG_PATTERN_ROWS)
+        editor->cursor_row = 0;
 }
 
 void editor_init(Editor *editor)
@@ -48,6 +88,16 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
             sequencer_set_tempo(sequencer, sequencer->frames_per_row > 2 ? sequencer->frames_per_row - 1 : 2);
         if(input->hit & KEY_DOWN)
             sequencer_set_tempo(sequencer, sequencer->frames_per_row < 30 ? sequencer->frames_per_row + 1 : 30);
+        if(input->hit & KEY_LEFT)
+        {
+            editor_lower_octave(editor);
+            editor_apply_pitch_to_cell(editor, song);
+        }
+        if(input->hit & KEY_RIGHT)
+        {
+            editor_raise_octave(editor);
+            editor_apply_pitch_to_cell(editor, song);
+        }
         return;
     }
 
@@ -68,26 +118,29 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         editor->cursor_row = editor->cursor_row > 0 ? editor->cursor_row - 1 : SONG_PATTERN_ROWS - 1;
 
     if(input->hit & KEY_DOWN)
-    {
-        editor->cursor_row++;
-        if(editor->cursor_row >= SONG_PATTERN_ROWS)
-            editor->cursor_row = 0;
-    }
+        editor_advance_row(editor);
+
+    if((input->hit & (KEY_LEFT | KEY_RIGHT | KEY_UP | KEY_DOWN)) != 0)
+        editor_pickup_cell_note(editor, song);
 
     if(input->hit & KEY_L)
     {
         editor_lower_note(editor);
-        audio_trigger_note((AudioChannel)editor->cursor_track,
-            editor->current_note,
-            instrument_get(editor_default_instrument(editor->cursor_track)));
+        editor_apply_pitch_to_cell(editor, song);
+        if(!editor->song_dirty)
+            audio_trigger_note((AudioChannel)editor->cursor_track,
+                editor->current_note,
+                instrument_get(editor_default_instrument(editor->cursor_track)));
     }
 
     if(input->hit & KEY_R)
     {
         editor_raise_note(editor);
-        audio_trigger_note((AudioChannel)editor->cursor_track,
-            editor->current_note,
-            instrument_get(editor_default_instrument(editor->cursor_track)));
+        editor_apply_pitch_to_cell(editor, song);
+        if(!editor->song_dirty)
+            audio_trigger_note((AudioChannel)editor->cursor_track,
+                editor->current_note,
+                instrument_get(editor_default_instrument(editor->cursor_track)));
     }
 
     if(input->hit & KEY_A)
@@ -99,6 +152,7 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         cell->param = 0;
         audio_trigger_note((AudioChannel)editor->cursor_track, cell->note, instrument_get(cell->instrument));
         editor->song_dirty = true;
+        editor_advance_row(editor);
     }
 
     if(input->hit & KEY_B)
