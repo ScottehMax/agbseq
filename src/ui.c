@@ -8,17 +8,19 @@
 #define UI_TRACK_WIDTH 44
 #define UI_TRACK_GAP 6
 
-#define UI_BG RGB15(3, 5, 7)
-#define UI_PANEL RGB15(7, 10, 13)
-#define UI_PANEL_DARK RGB15(4, 7, 10)
-#define UI_CELL RGB15(9, 12, 15)
-#define UI_CELL_ALT RGB15(8, 10, 13)
-#define UI_SELECTED RGB15(24, 20, 7)
-#define UI_PLAY_ROW RGB15(5, 15, 13)
-#define UI_TEXT RGB15(27, 29, 29)
-#define UI_TEXT_DIM RGB15(16, 19, 20)
-#define UI_ACCENT RGB15(30, 18, 7)
-#define UI_CLEAR RGB15(11, 8, 9)
+enum UiColor {
+    UI_BG = 1,
+    UI_PANEL,
+    UI_PANEL_DARK,
+    UI_CELL,
+    UI_CELL_ALT,
+    UI_SELECTED,
+    UI_PLAY_ROW,
+    UI_TEXT,
+    UI_TEXT_DIM,
+    UI_ACCENT,
+    UI_CLEAR,
+};
 
 typedef struct UiState {
     bool initialized;
@@ -56,8 +58,8 @@ static u8 ui_note_octave(u8 note)
 
 static u8 ui_visible_start(u8 cursor_row)
 {
-    if(cursor_row >= SONG_PATTERN_ROWS - UI_VISIBLE_ROWS)
-        return SONG_PATTERN_ROWS - UI_VISIBLE_ROWS;
+    if(cursor_row >= UI_VISIBLE_ROWS)
+        return cursor_row - UI_VISIBLE_ROWS + 1;
 
     return 0;
 }
@@ -77,18 +79,23 @@ static int ui_track_x(u8 track)
     return 34 + track * (UI_TRACK_WIDTH + UI_TRACK_GAP);
 }
 
-static void ui_text(int x, int y, COLOR color)
+static void ui_text(int x, int y, u8 color)
 {
     tte_set_ink(color);
     tte_set_pos(x, y);
 }
 
+static void ui_bind_text_target(void)
+{
+    tte_get_context()->dst.data = (u8*)vid_page;
+}
+
 static void ui_draw_shell(void)
 {
-    m3_fill(UI_BG);
-    m3_rect(0, 0, 240, 28, UI_PANEL);
-    m3_rect(0, 28, 240, 39, UI_PANEL_DARK);
-    m3_rect(0, 148, 240, 160, UI_PANEL);
+    m4_fill(UI_BG);
+    m4_rect(0, 0, 240, 28, UI_PANEL);
+    m4_rect(0, 28, 240, 39, UI_PANEL_DARK);
+    m4_rect(0, 148, 240, 160, UI_PANEL);
 
     ui_text(4, 30, UI_TEXT_DIM);
     tte_printf("ROW");
@@ -106,8 +113,8 @@ static void ui_draw_shell(void)
 
 static void ui_draw_status(const Sequencer *sequencer, const Editor *editor, u8 pattern_index)
 {
-    m3_rect(0, 0, 240, 28, UI_PANEL);
-    m3_rect(4, 4, 52, 22, sequencer->playing ? UI_PLAY_ROW : UI_CLEAR);
+    m4_rect(0, 0, 240, 28, UI_PANEL);
+    m4_rect(4, 4, 52, 22, sequencer->playing ? UI_PLAY_ROW : UI_CLEAR);
     ui_text(11, 8, UI_TEXT);
     tte_printf("%s", sequencer->playing ? "PLAY" : "STOP");
 
@@ -137,10 +144,10 @@ static void ui_draw_status(const Sequencer *sequencer, const Editor *editor, u8 
 static void ui_draw_cell(const PatternCell *cell, u8 track, int y, bool selected)
 {
     const int x = ui_track_x(track);
-    const COLOR fill = selected ? UI_SELECTED : (track & 1 ? UI_CELL_ALT : UI_CELL);
-    const COLOR text = selected ? UI_BG : UI_TEXT;
+    const u8 fill = selected ? UI_SELECTED : (track & 1 ? UI_CELL_ALT : UI_CELL);
+    const u8 text = selected ? UI_BG : UI_TEXT;
 
-    m3_rect(x, y, x + UI_TRACK_WIDTH, y + UI_ROW_HEIGHT, fill);
+    m4_rect(x, y, x + UI_TRACK_WIDTH, y + UI_ROW_HEIGHT, fill);
 
     ui_text(x + 10, y - 1, text);
     if(cell->note == SONG_EMPTY_NOTE)
@@ -162,8 +169,8 @@ static void ui_draw_pattern_row(
     const int y = ui_row_y(row, visible_start);
     const bool play_row = row == sequencer->row;
 
-    m3_rect(0, y, 240, y + UI_ROW_HEIGHT, play_row ? UI_PLAY_ROW : UI_BG);
-    m3_rect(0, y, 30, y + UI_ROW_HEIGHT, play_row ? UI_PLAY_ROW : UI_PANEL_DARK);
+    m4_rect(0, y, 240, y + UI_ROW_HEIGHT, play_row ? UI_PLAY_ROW : UI_BG);
+    m4_rect(0, y, 30, y + UI_ROW_HEIGHT, play_row ? UI_PLAY_ROW : UI_PANEL_DARK);
 
     ui_text(6, y - 1, play_row ? UI_TEXT : UI_TEXT_DIM);
     tte_printf("%02u", row);
@@ -179,7 +186,7 @@ static void ui_draw_grid(const Sequencer *sequencer, const Editor *editor, u8 pa
 {
     const Pattern *pattern = &sequencer->song->patterns[pattern_index];
 
-    m3_rect(0, UI_ROW_TOP, 240, 150, UI_BG);
+    m4_rect(0, UI_ROW_TOP, 240, 150, UI_BG);
 
     for(u8 offset = 0; offset < UI_VISIBLE_ROWS; offset++)
         ui_draw_pattern_row(sequencer, editor, pattern, visible_start, visible_start + offset);
@@ -187,8 +194,19 @@ static void ui_draw_grid(const Sequencer *sequencer, const Editor *editor, u8 pa
 
 void ui_init(void)
 {
-    REG_DISPCNT = DCNT_MODE3 | DCNT_BG2;
-    tte_init_bmp_default(3);
+    REG_DISPCNT = DCNT_MODE4 | DCNT_BG2;
+    pal_bg_mem[UI_BG] = RGB15(3, 5, 7);
+    pal_bg_mem[UI_PANEL] = RGB15(7, 10, 13);
+    pal_bg_mem[UI_PANEL_DARK] = RGB15(4, 7, 10);
+    pal_bg_mem[UI_CELL] = RGB15(9, 12, 15);
+    pal_bg_mem[UI_CELL_ALT] = RGB15(8, 10, 13);
+    pal_bg_mem[UI_SELECTED] = RGB15(24, 20, 7);
+    pal_bg_mem[UI_PLAY_ROW] = RGB15(5, 15, 13);
+    pal_bg_mem[UI_TEXT] = RGB15(27, 29, 29);
+    pal_bg_mem[UI_TEXT_DIM] = RGB15(16, 19, 20);
+    pal_bg_mem[UI_ACCENT] = RGB15(30, 18, 7);
+    pal_bg_mem[UI_CLEAR] = RGB15(11, 8, 9);
+    tte_init_bmp_default(4);
     tte_init_con();
     s_ui_state.initialized = false;
 }
@@ -202,60 +220,27 @@ void ui_render(const Sequencer *sequencer, const Editor *editor)
 {
     const u8 pattern_index = sequencer->song->order[sequencer->order_index];
     const u8 visible_start = ui_visible_start(editor->cursor_row);
-
-    if(!s_ui_state.initialized
+    const bool dirty = !s_ui_state.initialized
         || s_ui_state.pattern_index != pattern_index
-        || s_ui_state.visible_start != visible_start)
-    {
-        ui_draw_shell();
-        ui_draw_status(sequencer, editor, pattern_index);
-        ui_draw_grid(sequencer, editor, pattern_index, visible_start);
-        s_ui_state.initialized = true;
-        s_ui_state.playing = sequencer->playing;
-        s_ui_state.frames_per_row = sequencer->frames_per_row;
-        s_ui_state.pattern_index = pattern_index;
-        s_ui_state.row = sequencer->row;
-        s_ui_state.cursor_row = editor->cursor_row;
-        s_ui_state.cursor_track = editor->cursor_track;
-        s_ui_state.current_note = editor->current_note;
-        s_ui_state.visible_start = visible_start;
-        return;
-    }
-
-    if(s_ui_state.playing != sequencer->playing
+        || s_ui_state.visible_start != visible_start
+        || s_ui_state.playing != sequencer->playing
         || s_ui_state.frames_per_row != sequencer->frames_per_row
         || s_ui_state.row != sequencer->row
         || s_ui_state.cursor_row != editor->cursor_row
         || s_ui_state.cursor_track != editor->cursor_track
-        || s_ui_state.current_note != editor->current_note)
-    {
-        ui_draw_status(sequencer, editor, pattern_index);
-    }
+        || s_ui_state.current_note != editor->current_note
+        || editor->song_dirty;
 
-    const Pattern *pattern = &sequencer->song->patterns[pattern_index];
+    if(!dirty)
+        return;
 
-    if(s_ui_state.row != sequencer->row)
-    {
-        ui_draw_pattern_row(sequencer, editor, pattern, visible_start, s_ui_state.row);
-        ui_draw_pattern_row(sequencer, editor, pattern, visible_start, sequencer->row);
-    }
+    ui_bind_text_target();
+    ui_draw_shell();
+    ui_draw_status(sequencer, editor, pattern_index);
+    ui_draw_grid(sequencer, editor, pattern_index, visible_start);
+    vid_flip();
 
-    if(editor->song_dirty)
-        ui_draw_pattern_row(sequencer, editor, pattern, visible_start, editor->cursor_row);
-
-    if(s_ui_state.cursor_row != editor->cursor_row || s_ui_state.cursor_track != editor->cursor_track)
-    {
-        if(s_ui_state.cursor_row == editor->cursor_row)
-        {
-            ui_draw_pattern_row(sequencer, editor, pattern, visible_start, editor->cursor_row);
-        }
-        else
-        {
-            ui_draw_pattern_row(sequencer, editor, pattern, visible_start, s_ui_state.cursor_row);
-            ui_draw_pattern_row(sequencer, editor, pattern, visible_start, editor->cursor_row);
-        }
-    }
-
+    s_ui_state.initialized = true;
     s_ui_state.playing = sequencer->playing;
     s_ui_state.frames_per_row = sequencer->frames_per_row;
     s_ui_state.pattern_index = pattern_index;
