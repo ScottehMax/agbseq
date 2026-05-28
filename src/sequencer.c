@@ -35,7 +35,7 @@ static void sequencer_process_row(Sequencer *sequencer)
     }
 }
 
-void sequencer_init(Sequencer *sequencer, const Song *song)
+void sequencer_init(Sequencer *sequencer, Song *song)
 {
     sequencer->song = song;
     sequencer->playing = false;
@@ -84,4 +84,3 @@ void sequencer_set_tempo(Sequencer *sequencer, u8 frames_per_row)
     if(sequencer->frames_until_row > frames_per_row)
         sequencer->frames_until_row = frames_per_row;
 }
-

@@ -3,10 +3,11 @@
 
 #include <tonc.h>
 
+#include "editor.h"
 #include "sequencer.h"
 
 void ui_init(void);
-void ui_render(const Sequencer *sequencer);
+void ui_invalidate(void);
+void ui_render(const Sequencer *sequencer, const Editor *editor);
 
 #endif
-

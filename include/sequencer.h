@@ -6,7 +6,7 @@
 #include "song.h"
 
 typedef struct Sequencer {
-    const Song *song;
+    Song *song;
     bool playing;
     u8 order_index;
     u8 row;
@@ -14,11 +14,10 @@ typedef struct Sequencer {
     u8 frames_per_row;
 } Sequencer;
 
-void sequencer_init(Sequencer *sequencer, const Song *song);
+void sequencer_init(Sequencer *sequencer, Song *song);
 void sequencer_toggle_play(Sequencer *sequencer);
 void sequencer_stop(Sequencer *sequencer);
 void sequencer_update(Sequencer *sequencer);
 void sequencer_set_tempo(Sequencer *sequencer, u8 frames_per_row);
 
 #endif
-

@@ -1,6 +1,7 @@
 #include <tonc.h>
 
 #include "audio.h"
+#include "editor.h"
 #include "input.h"
 #include "sequencer.h"
 #include "song.h"
@@ -9,6 +10,8 @@
 int main(void)
 {
     Sequencer sequencer;
+    Editor editor;
+    Song song = g_demo_song;
     InputState input = { 0 };
 
     irq_init(NULL);
@@ -16,7 +19,8 @@ int main(void)
 
     audio_init();
     ui_init();
-    sequencer_init(&sequencer, &g_demo_song);
+    editor_init(&editor);
+    sequencer_init(&sequencer, &song);
 
     while(1)
     {
@@ -27,17 +31,12 @@ int main(void)
         if(input.hit & KEY_START)
             sequencer_toggle_play(&sequencer);
 
-        if(input.hit & KEY_SELECT)
+        editor_update(&editor, &song, &sequencer, &input);
+
+        if((input.hit & KEY_SELECT) && !(input.held & (KEY_UP | KEY_DOWN)))
             sequencer_stop(&sequencer);
 
-        if(input.hit & KEY_UP)
-            sequencer_set_tempo(&sequencer, sequencer.frames_per_row > 2 ? sequencer.frames_per_row - 1 : 2);
-
-        if(input.hit & KEY_DOWN)
-            sequencer_set_tempo(&sequencer, sequencer.frames_per_row < 30 ? sequencer.frames_per_row + 1 : 30);
-
         sequencer_update(&sequencer);
-        ui_render(&sequencer);
+        ui_render(&sequencer, &editor);
     }
 }
-
