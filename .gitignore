@@ -1,0 +1,18 @@
+# Build outputs
+/build/
+/*.elf
+/*.gba
+/*.map
+/*.sav
+
+# Toolchain intermediates
+*.o
+*.d
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+.DS_Store
