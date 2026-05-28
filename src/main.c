@@ -33,9 +33,6 @@ int main(void)
 
         editor_update(&editor, &song, &sequencer, &input);
 
-        if((input.hit & KEY_SELECT) && !(input.held & (KEY_UP | KEY_DOWN)))
-            sequencer_stop(&sequencer);
-
         sequencer_update(&sequencer);
         ui_render(&sequencer, &editor);
     }

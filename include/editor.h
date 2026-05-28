@@ -11,8 +11,14 @@ typedef struct Editor {
     u8 cursor_row;
     u8 cursor_track;
     u8 current_note;
+    u8 mode;
     bool song_dirty;
 } Editor;
+
+typedef enum EditorMode {
+    EDITOR_MODE_NOTE = 0,
+    EDITOR_MODE_EFFECT = 1
+} EditorMode;
 
 void editor_init(Editor *editor);
 void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const InputState *input);

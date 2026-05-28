@@ -31,6 +31,7 @@ typedef struct UiState {
     u8 cursor_row;
     u8 cursor_track;
     u8 current_note;
+    u8 mode;
     u8 visible_start;
 } UiState;
 
@@ -54,6 +55,27 @@ static const char *ui_note_name(u8 note)
 static u8 ui_note_octave(u8 note)
 {
     return note / 12;
+}
+
+static const char *ui_mode_name(const Editor *editor)
+{
+    return editor->mode == EDITOR_MODE_EFFECT ? "FX" : "NOTE";
+}
+
+static void ui_effect_text(const PatternCell *cell, char *dst)
+{
+    switch(cell->effect)
+    {
+    case EFFECT_SET_SPEED:
+        siprintf(dst, "S%02u", cell->param);
+        break;
+    case EFFECT_NOTE_CUT:
+        siprintf(dst, "CUT");
+        break;
+    default:
+        siprintf(dst, "---");
+        break;
+    }
 }
 
 static u8 ui_visible_start(u8 cursor_row)
@@ -108,7 +130,7 @@ static void ui_draw_shell(void)
     }
 
     ui_text(4, 149, UI_TEXT_DIM);
-    tte_printf("A add  B clear  L/R note  SEL+D");
+    tte_printf("SEL mode  A set  B clear  L/R edit");
 }
 
 static void ui_draw_status(const Sequencer *sequencer, const Editor *editor, u8 pattern_index)
@@ -129,7 +151,7 @@ static void ui_draw_status(const Sequencer *sequencer, const Editor *editor, u8 
     tte_printf("%02u", sequencer->row);
 
     ui_text(138, 4, UI_TEXT_DIM);
-    tte_printf("cursor");
+    tte_printf("%s", ui_mode_name(editor));
     ui_text(138, 14, UI_TEXT);
     tte_printf("R%02u C%u", editor->cursor_row, editor->cursor_track + 1);
 
@@ -141,19 +163,29 @@ static void ui_draw_status(const Sequencer *sequencer, const Editor *editor, u8 
     (void)pattern_index;
 }
 
-static void ui_draw_cell(const PatternCell *cell, u8 track, int y, bool selected)
+static void ui_draw_cell(const PatternCell *cell, u8 track, int y, bool selected, bool show_effect)
 {
     const int x = ui_track_x(track);
     const u8 fill = selected ? UI_SELECTED : (track & 1 ? UI_CELL_ALT : UI_CELL);
     const u8 text = selected ? UI_BG : UI_TEXT;
+    char effect_text[4];
 
     m4_rect(x, y, x + UI_TRACK_WIDTH, y + UI_ROW_HEIGHT, fill);
 
     ui_text(x + 10, y - 1, text);
-    if(cell->note == SONG_EMPTY_NOTE)
+    if(show_effect)
+    {
+        ui_effect_text(cell, effect_text);
+        tte_printf("%s", effect_text);
+    }
+    else if(cell->note == SONG_EMPTY_NOTE)
+    {
         tte_printf("...");
+    }
     else
+    {
         tte_printf("%s%u", ui_note_name(cell->note), ui_note_octave(cell->note));
+    }
 }
 
 static void ui_draw_pattern_row(
@@ -178,7 +210,12 @@ static void ui_draw_pattern_row(
     for(u8 track = 0; track < SONG_TRACK_COUNT; track++)
     {
         const bool selected = row == editor->cursor_row && track == editor->cursor_track;
-        ui_draw_cell(&pattern->cells[row][track], track, y, selected);
+        ui_draw_cell(
+            &pattern->cells[row][track],
+            track,
+            y,
+            selected,
+            editor->mode == EDITOR_MODE_EFFECT);
     }
 }
 
@@ -229,6 +266,7 @@ void ui_render(const Sequencer *sequencer, const Editor *editor)
         || s_ui_state.cursor_row != editor->cursor_row
         || s_ui_state.cursor_track != editor->cursor_track
         || s_ui_state.current_note != editor->current_note
+        || s_ui_state.mode != editor->mode
         || editor->song_dirty;
 
     if(!dirty)
@@ -248,5 +286,6 @@ void ui_render(const Sequencer *sequencer, const Editor *editor)
     s_ui_state.cursor_row = editor->cursor_row;
     s_ui_state.cursor_track = editor->cursor_track;
     s_ui_state.current_note = editor->current_note;
+    s_ui_state.mode = editor->mode;
     s_ui_state.visible_start = visible_start;
 }

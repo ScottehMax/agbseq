@@ -39,6 +39,60 @@ static PatternCell *editor_cursor_cell(Editor *editor, Song *song)
     return &song->patterns[pattern_index].cells[editor->cursor_row][editor->cursor_track];
 }
 
+static void editor_toggle_mode(Editor *editor)
+{
+    editor->mode = editor->mode == EDITOR_MODE_NOTE ? EDITOR_MODE_EFFECT : EDITOR_MODE_NOTE;
+}
+
+static void editor_cycle_effect(Editor *editor, Song *song, Sequencer *sequencer)
+{
+    PatternCell *cell = editor_cursor_cell(editor, song);
+
+    switch(cell->effect)
+    {
+    case EFFECT_NONE:
+        cell->effect = EFFECT_SET_SPEED;
+        cell->param = sequencer->frames_per_row;
+        break;
+    case EFFECT_SET_SPEED:
+        cell->effect = EFFECT_NOTE_CUT;
+        cell->param = 0;
+        break;
+    default:
+        cell->effect = EFFECT_NONE;
+        cell->param = 0;
+        break;
+    }
+
+    editor->song_dirty = true;
+}
+
+static void editor_clear_effect(Editor *editor, Song *song)
+{
+    PatternCell *cell = editor_cursor_cell(editor, song);
+
+    cell->effect = EFFECT_NONE;
+    cell->param = 0;
+    editor->song_dirty = true;
+}
+
+static void editor_adjust_effect_param(Editor *editor, Song *song, s8 delta)
+{
+    PatternCell *cell = editor_cursor_cell(editor, song);
+
+    if(cell->effect != EFFECT_SET_SPEED)
+        return;
+
+    if(delta < 0 && cell->param > 2)
+        cell->param--;
+    else if(delta > 0 && cell->param < 30)
+        cell->param++;
+    else
+        return;
+
+    editor->song_dirty = true;
+}
+
 static void editor_pickup_cell_note(Editor *editor, Song *song)
 {
     const PatternCell *cell = editor_cursor_cell(editor, song);
@@ -72,6 +126,7 @@ void editor_init(Editor *editor)
     editor->cursor_row = 0;
     editor->cursor_track = 0;
     editor->current_note = 48;
+    editor->mode = EDITOR_MODE_NOTE;
     editor->song_dirty = true;
 }
 
@@ -84,6 +139,8 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
 
     if(select_held)
     {
+        if((input->hit & KEY_SELECT) != 0 && (input->hit & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) == 0)
+            editor_toggle_mode(editor);
         if(input->hit & KEY_UP)
             sequencer_set_tempo(sequencer, sequencer->frames_per_row > 2 ? sequencer->frames_per_row - 1 : 2);
         if(input->hit & KEY_DOWN)
@@ -125,6 +182,12 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
 
     if(input->hit & KEY_L)
     {
+        if(editor->mode == EDITOR_MODE_EFFECT)
+        {
+            editor_adjust_effect_param(editor, song, -1);
+            return;
+        }
+
         editor_lower_note(editor);
         editor_apply_pitch_to_cell(editor, song);
         if(!editor->song_dirty)
@@ -135,6 +198,12 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
 
     if(input->hit & KEY_R)
     {
+        if(editor->mode == EDITOR_MODE_EFFECT)
+        {
+            editor_adjust_effect_param(editor, song, 1);
+            return;
+        }
+
         editor_raise_note(editor);
         editor_apply_pitch_to_cell(editor, song);
         if(!editor->song_dirty)
@@ -145,6 +214,12 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
 
     if(input->hit & KEY_A)
     {
+        if(editor->mode == EDITOR_MODE_EFFECT)
+        {
+            editor_cycle_effect(editor, song, sequencer);
+            return;
+        }
+
         PatternCell *cell = editor_cursor_cell(editor, song);
         cell->note = editor->current_note;
         cell->instrument = editor_default_instrument(editor->cursor_track);
@@ -157,6 +232,12 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
 
     if(input->hit & KEY_B)
     {
+        if(editor->mode == EDITOR_MODE_EFFECT)
+        {
+            editor_clear_effect(editor, song);
+            return;
+        }
+
         PatternCell *cell = editor_cursor_cell(editor, song);
         cell->note = SONG_EMPTY_NOTE;
         cell->instrument = 0;
