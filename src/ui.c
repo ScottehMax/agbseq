@@ -119,13 +119,13 @@ static void ui_draw_shell(void)
     m4_rect(0, 28, 240, 39, UI_PANEL_DARK);
     m4_rect(0, 148, 240, 160, UI_PANEL);
 
-    ui_text(4, 30, UI_TEXT_DIM);
+    ui_text(4, 28, UI_TEXT_DIM);
     tte_printf("ROW");
 
     static const char *tracks[] = { "CH1", "CH2", "WAV", "NOI" };
     for(u8 track = 0; track < SONG_TRACK_COUNT; track++)
     {
-        ui_text(ui_track_x(track) + 12, 30, UI_TEXT_DIM);
+        ui_text(ui_track_x(track) + 12, 28, UI_TEXT_DIM);
         tte_printf("%s", tracks[track]);
     }
 
