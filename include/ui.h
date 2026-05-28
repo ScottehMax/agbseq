@@ -9,5 +9,6 @@
 void ui_init(void);
 void ui_invalidate(void);
 void ui_render(const Sequencer *sequencer, const Editor *editor);
+void ui_commit(void);
 
 #endif
