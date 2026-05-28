@@ -3,6 +3,9 @@
 #include "audio.h"
 #include "instruments.h"
 
+#define EDITOR_PREVIEW_FRAMES 8
+#define EDITOR_NO_PREVIEW_TRACK 0xFF
+
 static u8 editor_default_instrument(u8 track)
 {
     return track + 1;
@@ -30,6 +33,29 @@ static void editor_lower_octave(Editor *editor)
 {
     if(editor->current_note >= 36)
         editor->current_note -= 12;
+}
+
+static void editor_preview_note(Editor *editor, AudioChannel channel, u8 note, const Instrument *instrument)
+{
+    if(editor->preview_track != EDITOR_NO_PREVIEW_TRACK && editor->preview_track != channel)
+        audio_stop_channel((AudioChannel)editor->preview_track);
+
+    audio_trigger_note(channel, note, instrument);
+    editor->preview_track = channel;
+    editor->preview_frames = EDITOR_PREVIEW_FRAMES;
+}
+
+static void editor_update_preview(Editor *editor)
+{
+    if(editor->preview_track == EDITOR_NO_PREVIEW_TRACK || editor->preview_frames == 0)
+        return;
+
+    editor->preview_frames--;
+    if(editor->preview_frames == 0)
+    {
+        audio_stop_channel((AudioChannel)editor->preview_track);
+        editor->preview_track = EDITOR_NO_PREVIEW_TRACK;
+    }
 }
 
 static PatternCell *editor_cursor_cell(Editor *editor, Song *song)
@@ -110,7 +136,11 @@ static void editor_apply_pitch_to_cell(Editor *editor, Song *song)
 
     cell->note = editor->current_note;
     cell->instrument = editor_default_instrument(editor->cursor_track);
-    audio_trigger_note((AudioChannel)editor->cursor_track, cell->note, instrument_get(cell->instrument));
+    editor_preview_note(
+        editor,
+        (AudioChannel)editor->cursor_track,
+        cell->note,
+        instrument_get(cell->instrument));
     editor->song_dirty = true;
 }
 
@@ -127,6 +157,8 @@ void editor_init(Editor *editor)
     editor->cursor_track = 0;
     editor->current_note = 48;
     editor->mode = EDITOR_MODE_NOTE;
+    editor->preview_frames = 0;
+    editor->preview_track = EDITOR_NO_PREVIEW_TRACK;
     editor->help_visible = false;
     editor->song_dirty = true;
 }
@@ -137,6 +169,7 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
     const u8 previous_track = editor->cursor_track;
 
     editor->song_dirty = false;
+    editor_update_preview(editor);
 
     if(editor->help_visible)
     {
@@ -183,7 +216,14 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
     }
 
     if(previous_track != editor->cursor_track)
+    {
         audio_stop_channel((AudioChannel)previous_track);
+        if(editor->preview_track == previous_track)
+        {
+            editor->preview_track = EDITOR_NO_PREVIEW_TRACK;
+            editor->preview_frames = 0;
+        }
+    }
 
     if(input->hit & KEY_UP)
         editor->cursor_row = editor->cursor_row > 0 ? editor->cursor_row - 1 : SONG_PATTERN_ROWS - 1;
@@ -205,7 +245,8 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         editor_lower_note(editor);
         editor_apply_pitch_to_cell(editor, song);
         if(!editor->song_dirty)
-            audio_trigger_note((AudioChannel)editor->cursor_track,
+            editor_preview_note(editor,
+                (AudioChannel)editor->cursor_track,
                 editor->current_note,
                 instrument_get(editor_default_instrument(editor->cursor_track)));
     }
@@ -221,7 +262,8 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         editor_raise_note(editor);
         editor_apply_pitch_to_cell(editor, song);
         if(!editor->song_dirty)
-            audio_trigger_note((AudioChannel)editor->cursor_track,
+            editor_preview_note(editor,
+                (AudioChannel)editor->cursor_track,
                 editor->current_note,
                 instrument_get(editor_default_instrument(editor->cursor_track)));
     }
@@ -239,7 +281,11 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         cell->instrument = editor_default_instrument(editor->cursor_track);
         cell->effect = EFFECT_NONE;
         cell->param = 0;
-        audio_trigger_note((AudioChannel)editor->cursor_track, cell->note, instrument_get(cell->instrument));
+        editor_preview_note(
+            editor,
+            (AudioChannel)editor->cursor_track,
+            cell->note,
+            instrument_get(cell->instrument));
         editor->song_dirty = true;
         editor_advance_row(editor);
     }
@@ -258,6 +304,11 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
         cell->effect = EFFECT_NONE;
         cell->param = 0;
         audio_stop_channel((AudioChannel)editor->cursor_track);
+        if(editor->preview_track == editor->cursor_track)
+        {
+            editor->preview_track = EDITOR_NO_PREVIEW_TRACK;
+            editor->preview_frames = 0;
+        }
         editor->song_dirty = true;
     }
 }

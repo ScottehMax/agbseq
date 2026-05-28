@@ -12,6 +12,8 @@ typedef struct Editor {
     u8 cursor_track;
     u8 current_note;
     u8 mode;
+    u8 preview_frames;
+    u8 preview_track;
     bool help_visible;
     bool song_dirty;
 } Editor;
