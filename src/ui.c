@@ -173,7 +173,7 @@ static void ui_draw_cell(const PatternCell *cell, u8 track, int y, bool selected
 
     m4_rect(x, y, x + UI_TRACK_WIDTH, y + UI_ROW_HEIGHT, fill);
 
-    ui_text(x + 10, y - 1, text);
+    ui_text(x + 10, y - 2, text);
     if(show_effect)
     {
         ui_effect_text(cell, effect_text);
@@ -205,7 +205,7 @@ static void ui_draw_pattern_row(
     m4_rect(0, y, 240, y + UI_ROW_HEIGHT, play_row ? UI_PLAY_ROW : UI_BG);
     m4_rect(0, y, 30, y + UI_ROW_HEIGHT, play_row ? UI_PLAY_ROW : UI_PANEL_DARK);
 
-    ui_text(6, y - 1, play_row ? UI_TEXT : UI_TEXT_DIM);
+    ui_text(6, y - 2, play_row ? UI_TEXT : UI_TEXT_DIM);
     tte_printf("%02u", row);
 
     for(u8 track = 0; track < SONG_TRACK_COUNT; track++)
