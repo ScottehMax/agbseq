@@ -127,6 +127,7 @@ void editor_init(Editor *editor)
     editor->cursor_track = 0;
     editor->current_note = 48;
     editor->mode = EDITOR_MODE_NOTE;
+    editor->help_visible = false;
     editor->song_dirty = true;
 }
 
@@ -137,8 +138,21 @@ void editor_update(Editor *editor, Song *song, Sequencer *sequencer, const Input
 
     editor->song_dirty = false;
 
+    if(editor->help_visible)
+    {
+        if(input->hit != 0)
+            editor->help_visible = false;
+        return;
+    }
+
     if(select_held)
     {
+        if(input->hit & KEY_L)
+        {
+            editor->help_visible = true;
+            return;
+        }
+
         if((input->hit & KEY_SELECT) != 0 && (input->hit & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) == 0)
             editor_toggle_mode(editor);
         if(input->hit & KEY_UP)

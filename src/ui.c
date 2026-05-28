@@ -32,6 +32,7 @@ typedef struct UiState {
     u8 cursor_track;
     u8 current_note;
     u8 mode;
+    bool help_visible;
     u8 visible_start;
 } UiState;
 
@@ -229,6 +230,39 @@ static void ui_draw_grid(const Sequencer *sequencer, const Editor *editor, u8 pa
         ui_draw_pattern_row(sequencer, editor, pattern, visible_start, visible_start + offset);
 }
 
+static void ui_help_line(int y, const char *left, const char *right)
+{
+    ui_text(18, y, UI_ACCENT);
+    tte_printf("%s", left);
+    ui_text(110, y, UI_TEXT);
+    tte_printf("%s", right);
+}
+
+static void ui_draw_help(void)
+{
+    m4_fill(UI_BG);
+    m4_rect(0, 0, 240, 26, UI_PANEL);
+    m4_rect(0, 148, 240, 160, UI_PANEL);
+
+    ui_text(12, 8, UI_TEXT);
+    tte_printf("agbseq help");
+    ui_text(96, 8, UI_TEXT_DIM);
+    tte_printf("pattern sequencer");
+
+    ui_help_line(34, "START", "play / pause");
+    ui_help_line(46, "D-PAD", "move cursor");
+    ui_help_line(58, "A", "set note or cycle FX");
+    ui_help_line(70, "B", "clear note or FX");
+    ui_help_line(82, "L / R", "edit pitch or FX value");
+    ui_help_line(94, "SELECT", "switch NOTE / FX mode");
+    ui_help_line(106, "SEL+UP/DN", "change speed");
+    ui_help_line(118, "SEL+LEFT/RIGHT", "octave down / up");
+    ui_help_line(130, "SEL+L", "show this screen");
+
+    ui_text(60, 148, UI_TEXT_DIM);
+    tte_printf("Press any button to return");
+}
+
 void ui_init(void)
 {
     REG_DISPCNT = DCNT_MODE4 | DCNT_BG2;
@@ -267,12 +301,32 @@ void ui_render(const Sequencer *sequencer, const Editor *editor)
         || s_ui_state.cursor_track != editor->cursor_track
         || s_ui_state.current_note != editor->current_note
         || s_ui_state.mode != editor->mode
+        || s_ui_state.help_visible != editor->help_visible
         || editor->song_dirty;
 
     if(!dirty)
         return;
 
     ui_bind_text_target();
+    if(editor->help_visible)
+    {
+        ui_draw_help();
+        vid_flip();
+
+        s_ui_state.initialized = true;
+        s_ui_state.playing = sequencer->playing;
+        s_ui_state.frames_per_row = sequencer->frames_per_row;
+        s_ui_state.pattern_index = pattern_index;
+        s_ui_state.row = sequencer->row;
+        s_ui_state.cursor_row = editor->cursor_row;
+        s_ui_state.cursor_track = editor->cursor_track;
+        s_ui_state.current_note = editor->current_note;
+        s_ui_state.mode = editor->mode;
+        s_ui_state.help_visible = editor->help_visible;
+        s_ui_state.visible_start = visible_start;
+        return;
+    }
+
     ui_draw_shell();
     ui_draw_status(sequencer, editor, pattern_index);
     ui_draw_grid(sequencer, editor, pattern_index, visible_start);
@@ -287,5 +341,6 @@ void ui_render(const Sequencer *sequencer, const Editor *editor)
     s_ui_state.cursor_track = editor->cursor_track;
     s_ui_state.current_note = editor->current_note;
     s_ui_state.mode = editor->mode;
+    s_ui_state.help_visible = editor->help_visible;
     s_ui_state.visible_start = visible_start;
 }
